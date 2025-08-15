@@ -5,6 +5,7 @@ pipeline {
         stage('Extract Repository Info') {
             steps {
                 script {
+                    echo "${WORKSPACE}"
                     // Extract repository name from GIT_URL
                     if (env.GIT_URL) {
                         def repoUrl = env.GIT_URL
@@ -35,6 +36,7 @@ pipeline {
         stage('Validate Target Jenkinsfile') {
             steps {
                 script {
+                    echo "${WORKSPACE}"
                     sh 'ls -ltr'
                     if (!fileExists(env.TARGET_JENKINSFILE)) {
                         error("Target Jenkinsfile does not exist: ${env.TARGET_JENKINSFILE}")
