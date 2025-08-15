@@ -6,13 +6,10 @@ pipeline {
         ENVIRONMENT_NAME = 'sit'
         PROJECT_NAME = "bbik-${MICROSERVICE_NAME}"
 
-        // Git configuration
-        GIT_REPO_URL = 'https://github.com/peerawitp/jenkins-lab'
-
         // Docker configuration
         DOCKER_COMPILE_IMAGE = 'maven:3.9.9-amazoncorretto-21'
         DOCKER_UNIT_TEST_IMAGE = 'maven:3.9.9-amazoncorretto-21'
-        IMAGE_NAME = 'peerawitp/jenkins-lab'
+        IMAGE_NAME = 'peerawitp/ms-jenkins-lab'
         DOCKERFILE = './docker/Dockerfile'
 
         // SonarQube configuration
@@ -30,8 +27,8 @@ pipeline {
                 cleanWs()
 
                 dir('code-resource') {
-                    git url: "${GIT_REPO_URL}",
-                    branch: 'sit'
+                    git url: "${GIT_URL}",
+                    branch: "${GIT_BRANCH}"
                     stash name: 'src', includes: '*/', useDefaultExcludes: false
                 }
             }

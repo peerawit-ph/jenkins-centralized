@@ -19,7 +19,7 @@ pipeline {
                     env.ENVIRONMENT = branchName.replaceAll('^origin/', '')
 
                     // Construct the path to the specific Jenkinsfile
-                    env.TARGET_JENKINSFILE = "ms-${env.REPO_NAME}/${env.ENVIRONMENT}.jenkinsfile"
+                    env.TARGET_JENKINSFILE = "${env.REPO_NAME}/${env.ENVIRONMENT}.jenkinsfile"
 
                     echo "=== Dispatcher Information ==="
                     echo "GIT_URL: ${env.GIT_URL}"
