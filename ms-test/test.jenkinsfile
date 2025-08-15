@@ -6,6 +6,7 @@ pipeline {
             steps {
                 cleanWs()
                 echo "${env.GIT_URL}"
+                echo "${env.GIT_BRANCH}"
                 echo "${env.RJPP_SCM_URL}"
                 echo "${env.RJPP_JENKINSFILE}"
                 echo "${env.RJPP_BRANCH}"
