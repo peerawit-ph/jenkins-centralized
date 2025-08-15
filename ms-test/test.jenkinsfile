@@ -9,6 +9,7 @@ pipeline {
                 echo "${env.RJPP_JENKINSFILE}"
                 echo "${env.RJPP_BRANCH}"
                 echo "${env.RJPP_LOCAL_MARKER}"
+                echo "${env}"
             }
         }
     }
