@@ -1,0 +1,194 @@
+pipeline {
+    agent any
+
+    environment {
+        MICROSERVICE_NAME = 'test'
+        ENVIRONMENT_NAME = 'sit'
+        PROJECT_NAME = "bbik-${MICROSERVICE_NAME}"
+
+        // Git configuration
+        GIT_REPO_URL = 'https://github.com/peerawitp/jenkins-lab'
+
+        // Docker configuration
+        DOCKER_COMPILE_IMAGE = 'maven:3.9.9-amazoncorretto-21'
+        DOCKER_UNIT_TEST_IMAGE = 'maven:3.9.9-amazoncorretto-21'
+        IMAGE_NAME = 'peerawitp/jenkins-lab'
+        DOCKERFILE = './docker/Dockerfile'
+
+        // SonarQube configuration
+        SONARQUBE_TOOL_NAME = 'sq1'
+        SONARQUBE_PROJECT_KEY = 'jenkins-lab-sit'
+
+        // DefectDojo configuration
+        DEFECTDOJO_URL = credentials('defectdojo-url')
+        DEFECTDOJO_API_KEY = credentials('sit-defectdojo-token')
+    }
+
+    stages {
+        stage('Prepare Git Repository') {
+            steps {
+                cleanWs()
+
+                dir('code-resource') {
+                    git url: "${GIT_REPO_URL}",
+                    branch: 'sit'
+                    stash name: 'src', includes: '*/', useDefaultExcludes: false
+                }
+            }
+        }
+
+        stage('Compile Maven Project') {
+            agent {
+                docker {
+                    image "${DOCKER_COMPILE_IMAGE}"
+                }
+            }
+            steps {
+                dir('code-resource') {
+                    unstash 'src'
+                    script {
+                        sh 'mvn clean package compile -DskipTests'
+                    }
+                    stash name: 'src-compiled', includes: 'target/**', useDefaultExcludes: false
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                dir('code-resource') {
+                    unstash 'src-compiled'
+                    script {
+                        sh 'ls -ltr && ls -ltr target/'
+                        def scannerHome = tool "${SONARQUBE_TOOL_NAME}"
+                        withSonarQubeEnv() {
+                            sh """
+                                ${scannerHome}/bin/sonar-scanner \
+                                    -Dsonar.projectKey=${SONARQUBE_PROJECT_KEY} \
+                                    -Dsonar.sources=src/main/java/ \
+                                    -Dsonar.language=java \
+                                    -Dsonar.java.binaries=target/ \
+                                    -Dsonar.project.tags="${ENVIRONMENT_NAME}"
+                            """
+                        }
+                        // Uncomment the following lines if you want to check quality gate status
+                        // timeout(time: 1, unit: 'MINUTES') {
+                        //     def qg = waitForQualityGate()
+                        //     if (qg.status != 'OK') {
+                        //         error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                        //     }
+                        // }
+                    }
+                }
+            }
+        }
+
+        stage('Unit Test') {
+            agent {
+                docker {
+                    image "${DOCKER_UNIT_TEST_IMAGE}"
+                    args '-v $HOME/.m2:/root/.m2'
+                }
+            }
+            steps {
+                dir('code-resource') {
+                    unstash 'src'
+                    script {
+                        sh 'mvn test'
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    docker.build("${IMAGE_NAME}:${ENVIRONMENT_NAME}", "-f ./code-resource/${DOCKERFILE} ./code-resource")
+                }
+            }
+        }
+
+        stage('Trivy Scan') {
+            agent {
+                docker {
+                    image 'aquasec/trivy:latest'
+                    args '-v $HOME/.cache:/root/.cache --entrypoint=""'
+                }
+            }
+            steps {
+                script {
+                    def outputFile = "trivy-report-${PROJECT_NAME}-${ENVIRONMENT_NAME}.json"
+                    sh "mkdir -p reports"
+                    sh "trivy --debug image --format json -o reports/${outputFile} ${IMAGE_NAME}:${ENVIRONMENT_NAME}"
+                    sh "cat reports/$outputFile"
+                    sh "ls -ltr"
+                    sh "ls -ltr reports/"
+                    stash name: 'trivy-report', includes: "reports/**", useDefaultExcludes: false
+                }
+            }
+        }
+
+        // stage('Publish Report to DefectDojo') {
+        //     steps {
+        //         script {
+        //             unstash 'trivy-report'
+        //             defectDojoPublisher(
+        //                 artifact: "reports/trivy-report-${PROJECT_NAME}-${ENVIRONMENT_NAME}.json",
+        //                 productName: "$PROJECT_NAME",
+        //                 scanType: 'Trivy Scan',
+        //                 engagementName: "${ENVIRONMENT_NAME}-build-${BUILD_ID}",
+        //             )
+        //         }
+        //     }
+        // }
+
+        stage('Publish Report to DefectDojo') {
+            steps {
+                script {
+                    unstash 'trivy-report'
+                    sh """
+                        ls -ltr
+                        echo "Uploading Trivy report to DefectDojo..."
+                        curl -X POST "$DEFECTDOJO_URL/api/v2/import-scan/" \
+                            -H "Authorization: Token $DEFECTDOJO_API_KEY" \
+                            -F "product_name=$PROJECT_NAME" \
+                            -F "service=$MICROSERVICE_NAME" \
+                            -F "build_id=$BUILD_ID" \
+                            -F "product_type_name=Research and Development" \
+                            -F "engagement_name=Jenkins CI/CD" \
+                            -F "branch_tag=$ENVIRONMENT_NAME" \
+                            -F "environment=$ENVIRONMENT_NAME" \
+                            -F "scan_type=Trivy Scan" \
+                            -F "deduplication_on_engagement=true" \
+                            -F "apply_tags_to_findings=true" \
+                            -F "source_code_management_uri=${GIT_REPO_URL}/tree/${ENVIRONMENT_NAME}" \
+                            -F "file=@reports/trivy-report-${PROJECT_NAME}-${ENVIRONMENT_NAME}.json" \
+                            -F "active=true" -F "verified=false" -F "auto_create_context=true"
+                    """
+                }
+            }
+        }
+
+        stage('Push Docker Image to Registry') {
+            steps {
+                script {
+                    docker.withRegistry('', 'docker-hub-peerawitp') {
+                        def dockerImage = docker.image("${IMAGE_NAME}:${ENVIRONMENT_NAME}")
+                        dockerImage.push()
+                    }
+                }
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
