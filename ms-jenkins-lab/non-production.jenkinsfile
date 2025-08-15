@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         MICROSERVICE_NAME = 'test'
-        ENVIRONMENT_NAME = 'sit'
+        ENVIRONMENT_NAME = "${BRANCH_NAME}"
         PROJECT_NAME = "bbik-${MICROSERVICE_NAME}"
 
         // Docker configuration
