@@ -26,7 +26,7 @@ pipeline {
                     echo "DEBUG: Cleaned environment: ${env.ENVIRONMENT}"
 
                     // Construct the path to the specific Jenkinsfile
-                    env.TARGET_JENKINSFILE = "ms-${env.REPO_NAME}/${env.ENVIRONMENT}.jenkinsfile"
+                    env.TARGET_JENKINSFILE = "${env.REPO_NAME}/${env.ENVIRONMENT}.jenkinsfile"
                     echo "DEBUG: Target path: ${env.TARGET_JENKINSFILE}"
                     echo "DEBUG: Workspace: ${env.WORKSPACE}"
 
