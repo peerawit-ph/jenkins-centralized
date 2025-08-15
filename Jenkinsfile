@@ -35,6 +35,7 @@ pipeline {
         stage('Validate Target Jenkinsfile') {
             steps {
                 script {
+                    sh 'ls -ltr'
                     if (!fileExists(env.TARGET_JENKINSFILE)) {
                         error("Target Jenkinsfile does not exist: ${env.TARGET_JENKINSFILE}")
                     }
