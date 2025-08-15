@@ -9,8 +9,12 @@ pipeline {
                     // Extract repository name from GIT_URL
                     if (env.GIT_URL) {
                         def repoUrl = env.GIT_URL
-                        def repoName = repoUrl.split('/').last().replaceAll('\\.git$', '')
+                        def fullRepoName = repoUrl.split('/').last().replaceAll('\\.git$', '')
+                        // Handle jenkins-centralized -> jenkins-lab mapping
+                        def repoName = fullRepoName.replace('jenkins-centralized', 'jenkins-lab')
                         env.REPO_NAME = repoName
+                        echo "DEBUG: Full repo name: ${fullRepoName}"
+                        echo "DEBUG: Mapped repo name: ${repoName}"
                     } else {
                         error("GIT_URL environment variable is not set")
                     }
@@ -18,9 +22,13 @@ pipeline {
                     // Use GIT_BRANCH as environment, filter out origin/ prefix, default to 'main' if not set
                     def branchName = env.GIT_BRANCH ?: 'main'
                     env.ENVIRONMENT = branchName.replaceAll('^origin/', '')
+                    echo "DEBUG: Original branch: ${env.GIT_BRANCH}"
+                    echo "DEBUG: Cleaned environment: ${env.ENVIRONMENT}"
 
                     // Construct the path to the specific Jenkinsfile
-                    env.TARGET_JENKINSFILE = "${env.REPO_NAME}/${env.ENVIRONMENT}.jenkinsfile"
+                    env.TARGET_JENKINSFILE = "ms-${env.REPO_NAME}/${env.ENVIRONMENT}.jenkinsfile"
+                    echo "DEBUG: Target path: ${env.TARGET_JENKINSFILE}"
+                    echo "DEBUG: Workspace: ${env.WORKSPACE}"
 
                     echo "=== Dispatcher Information ==="
                     echo "GIT_URL: ${env.GIT_URL}"
@@ -29,6 +37,18 @@ pipeline {
                     echo "Environment: ${env.ENVIRONMENT}"
                     echo "Target Jenkinsfile: ${env.TARGET_JENKINSFILE}"
                     echo "============================="
+                }
+            }
+        }
+
+        stage('Debug Workspace') {
+            steps {
+                script {
+                    echo "=== Workspace Contents ==="
+                    sh 'pwd'
+                    sh 'ls -la'
+                    sh 'find . -name "*.jenkinsfile" -type f'
+                    echo "=========================="
                 }
             }
         }
