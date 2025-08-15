@@ -14,8 +14,9 @@ pipeline {
                         error("GIT_URL environment variable is not set")
                     }
 
-                    // Use GIT_BRANCH as environment, default to 'main' if not set
-                    env.ENVIRONMENT = env.GIT_BRANCH ?: 'main'
+                    // Use GIT_BRANCH as environment, filter out origin/ prefix, default to 'main' if not set
+                    def branchName = env.GIT_BRANCH ?: 'main'
+                    env.ENVIRONMENT = branchName.replaceAll('^origin/', '')
 
                     // Construct the path to the specific Jenkinsfile
                     env.TARGET_JENKINSFILE = "ms-${env.REPO_NAME}/${env.ENVIRONMENT}.jenkinsfile"
